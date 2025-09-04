@@ -258,6 +258,55 @@ impl AffineWavefronts {
         }
     }
 
+    pub fn set_penalties_edit(
+        &mut self,
+        match_: i32,
+        mismatch: i32,
+        gap_opening1: i32,
+    ) {
+        unsafe {
+            (*self.wf_aligner).penalties.match_ = match_;
+            (*self.wf_aligner).penalties.mismatch = mismatch;
+            (*self.wf_aligner).penalties.gap_opening1 = gap_opening1;
+            (*self.wf_aligner).penalties.gap_extension1 = -1;
+            (*self.wf_aligner).penalties.gap_opening2 = -1;
+            (*self.wf_aligner).penalties.gap_extension2 = -1;
+        }
+    }
+
+    pub fn with_penalties_edit(
+        match_: i32,
+        mismatch: i32,
+        gap_opening1: i32,
+    ) -> Self {
+        unsafe {
+            // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
+            let mut attributes = wfa::wavefront_aligner_attr_default;
+
+            // Set distance metric
+            attributes.distance_metric = wfa::distance_metric_t_edit;
+
+            // Set penalties
+            attributes.affine2p_penalties.match_ = match_;
+            attributes.affine2p_penalties.mismatch = mismatch;
+            attributes.affine2p_penalties.gap_opening1 = gap_opening1;
+            attributes.affine2p_penalties.gap_extension1 = -1;
+            attributes.affine2p_penalties.gap_opening2 = -1;
+            attributes.affine2p_penalties.gap_extension2 = -1;
+
+            // Set memory mode
+            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high;
+
+            // Disable heuristic
+            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+
+            // Create aligner with attributes
+            let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
+
+            Self { wf_aligner }
+        }
+    }
+
     pub fn get_distance_metric(&self) -> DistanceMetric {
         unsafe {
             match (*self.wf_aligner).penalties.distance_metric {
