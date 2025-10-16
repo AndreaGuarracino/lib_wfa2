@@ -18,8 +18,26 @@ impl BuildPaths {
     }
 }
 
+fn setup_compiler_environment() {
+    // Set compiler environment variables to override hardcoded paths in WFA2-lib Makefile
+    if cfg!(target_os = "macos") {
+        env::set_var("CC", "clang");
+        env::set_var("CXX", "clang++");
+    } else if cfg!(target_os = "linux") {
+        env::set_var("CC", "gcc");
+        env::set_var("CXX", "g++");
+    } else {
+        // Default fallback
+        env::set_var("CC", "clang");
+        env::set_var("CXX", "clang++");
+    }
+}
+
 fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
     let paths = BuildPaths::new();
+
+    // Set up compiler environment before doing anything else
+    setup_compiler_environment();
 
     // Check if WFA2-lib exists and has Makefile
     if !paths.wfa_src.join("Makefile").exists() {
