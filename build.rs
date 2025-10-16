@@ -1,6 +1,6 @@
 // extern crate bindgen;
 
-use std::{path::PathBuf, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 struct BuildPaths {
     wfa_src: PathBuf,
@@ -26,15 +26,63 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         return Err("WFA2-lib/Makefile not found. Make sure the submodule is initialized.".into());
     }
 
-    // Build WFA2-lib in place
-    let output = Command::new("make")
+    // Detect platform and set appropriate compiler flags
+    let target = env::var("TARGET").unwrap_or_default();
+    let mut make_cmd = Command::new("make");
+
+    // Handle platform-specific flags
+    if target.contains("apple") || cfg!(target_os = "macos") {
+        // Base CFLAGS for the target architecture
+        let mut cflags = if target.contains("aarch64") {
+            "-O3 -mcpu=apple-m1".to_string()
+        } else {
+            "-O3 -mtune=native".to_string()
+        };
+
+        // On macOS, find libomp installed by Homebrew to get correct paths
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()?
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
+
+        // Add the include path for omp.h to CFLAGS
+        cflags.push_str(&format!(" -I{}/include", libomp_prefix));
+        make_cmd.env("CFLAGS", cflags);
+
+        // Add the library path for the linker
+        make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
+
+        // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
+        make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
+    } else if target.contains("x86_64") {
+        make_cmd.env("CFLAGS", "-O3 -march=native");
+    } else if target.contains("aarch64") || target.contains("arm") {
+        make_cmd.env("CFLAGS", "-O3 -mcpu=native");
+    } else {
+        make_cmd.env("CFLAGS", "-O3");
+    }
+
+    // Disable building examples and tools
+    make_cmd.env("BUILD_EXAMPLES", "0");
+    make_cmd.env("BUILD_TOOLS", "0");
+    //make_cmd.env("BUILD_WFA_PARALLEL", "0");
+
+    // Clean and build only the static library, not the tools.
+    let output = make_cmd
         .args(["clean", "all"])
         .current_dir(&paths.wfa_src)
         .output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Make failed: {}", stderr).into());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("Make failed:\nSTDOUT:\n{}\nSTDERR:\n{}", stdout, stderr).into());
     }
 
     Ok(())
@@ -45,9 +93,30 @@ fn setup_linking() {
 
     // Link the WFA library
     println!("cargo:rustc-link-lib=static=wfa");
-    println!("cargo:rustc-link-lib=gomp");
 
-    // Set library search path
+    // On macOS, link against libomp instead of libgomp for the final Rust binary
+    let target = env::var("TARGET").unwrap_or_default();
+    if target.contains("apple") || cfg!(target_os = "macos") {
+        // Find libomp from Homebrew and add its lib path for rustc to find.
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()
+                .expect("Failed to execute brew command to find libomp")
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
+        println!("cargo:rustc-link-search=native={}/lib", libomp_prefix);
+
+        println!("cargo:rustc-link-lib=omp");
+    } else {
+        println!("cargo:rustc-link-lib=gomp");
+    }
+
+    // Set library search path for WFA
     println!(
         "cargo:rustc-link-search=native={}",
         paths.wfa_lib_dir().display()
