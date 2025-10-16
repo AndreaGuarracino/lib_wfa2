@@ -68,9 +68,13 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         make_cmd.env("CFLAGS", "-O3");
     }
 
+    // Disable building examples and tools
+    make_cmd.env("BUILD_EXAMPLES", "0");
+    make_cmd.env("BUILD_TOOLS", "0");
+
     // Clean and build only the static library, not the tools.
     let output = make_cmd
-        .args(["clean"]) // <--- This now correctly targets the library rule
+        .args(["clean", "all"])
         .current_dir(&paths.wfa_src)
         .output()?;
 
