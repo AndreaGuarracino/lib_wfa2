@@ -54,13 +54,12 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // Add the include path for omp.h to CFLAGS
         cflags.push_str(&format!(" -I{}/include", libomp_prefix));
         make_cmd.env("CFLAGS", cflags);
-        
+
         // Add the library path for the linker
         make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
 
         // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
         make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
-
     } else if target.contains("x86_64") {
         make_cmd.env("CFLAGS", "-O3 -march=native");
     } else if target.contains("aarch64") || target.contains("arm") {
