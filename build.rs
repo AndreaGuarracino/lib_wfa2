@@ -54,7 +54,7 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // Add the include path for omp.h to CFLAGS
         cflags.push_str(&format!(" -I{}/include", libomp_prefix));
         make_cmd.env("CFLAGS", cflags);
-        
+
         // Add the library path for the linker
         make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
 
@@ -62,7 +62,6 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // The Makefile appends this to CFLAGS, and it needs both the preprocessor
         // flag for the compiler and the linker flag.
         make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
-
     } else if target.contains("x86_64") {
         // For x86_64 Linux, let the Makefile use the default OMP_FLAG="-fopenmp"
         make_cmd.env("CFLAGS", "-O3 -march=native");
