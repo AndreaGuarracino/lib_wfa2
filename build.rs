@@ -32,43 +32,49 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
 
     // Handle platform-specific flags
     if target.contains("apple") || cfg!(target_os = "macos") {
-        // For Apple Silicon/macOS, use mcpu=apple-m1 or generic flags
+        // Base CFLAGS for the target architecture
         let mut cflags = if target.contains("aarch64") {
-            // Apple Silicon M1/M2/M3
-            String::from("-O3 -mcpu=apple-m1")
+            "-O3 -mcpu=apple-m1".to_string()
         } else {
-            // Intel Mac
-            String::from("-O3 -mtune=native")
+            "-O3 -mtune=native".to_string()
         };
 
-        // Add OpenMP include path if set in environment
-        if let Ok(cppflags) = env::var("CPPFLAGS") {
-            cflags.push(' ');
-            cflags.push_str(&cppflags);
-        }
-        if let Ok(extra_cflags) = env::var("CFLAGS") {
-            cflags.push(' ');
-            cflags.push_str(&extra_cflags);
-        }
+        // On macOS, find libomp installed by Homebrew to get correct paths
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()?
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
 
+        // Add the include path for omp.h to CFLAGS
+        cflags.push_str(&format!(" -I{}/include", libomp_prefix));
         make_cmd.env("CFLAGS", cflags);
+        
+        // Add the library path for the linker
+        make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
 
-        // Pass LDFLAGS for linking
-        if let Ok(ldflags) = env::var("LDFLAGS") {
-            make_cmd.env("LDFLAGS", ldflags);
-        }
+        // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
+        // The Makefile appends this to CFLAGS, and it needs both the preprocessor
+        // flag for the compiler and the linker flag.
+        make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
+
     } else if target.contains("x86_64") {
-        // x86_64 Linux/Windows
+        // For x86_64 Linux, let the Makefile use the default OMP_FLAG="-fopenmp"
         make_cmd.env("CFLAGS", "-O3 -march=native");
     } else if target.contains("aarch64") || target.contains("arm") {
-        // ARM Linux
+        // For ARM Linux, let the Makefile use the default OMP_FLAG="-fopenmp"
         make_cmd.env("CFLAGS", "-O3 -mcpu=native");
     } else {
-        // Fallback to generic optimization
+        // Fallback for other platforms
         make_cmd.env("CFLAGS", "-O3");
     }
 
-    // Clean and build
+    // Clean and build the C library
     let output = make_cmd
         .args(["clean", "all"])
         .current_dir(&paths.wfa_src)
@@ -88,19 +94,10 @@ fn setup_linking() {
     // Link the WFA library
     println!("cargo:rustc-link-lib=static=wfa");
 
-    // On macOS, link against libomp instead of libgomp
+    // On macOS, link against libomp instead of libgomp for the final Rust binary
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("apple") || cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=omp");
-
-        // Add libomp library path based on architecture
-        if target.contains("aarch64") {
-            // Apple Silicon - Homebrew uses /opt/homebrew
-            println!("cargo:rustc-link-search=native=/opt/homebrew/opt/libomp/lib");
-        } else {
-            // Intel Mac - Homebrew uses /usr/local
-            println!("cargo:rustc-link-search=native=/usr/local/opt/libomp/lib");
-        }
     } else {
         println!("cargo:rustc-link-lib=gomp");
     }
