@@ -74,6 +74,10 @@ jobs:
     - name: Install dependencies
       run: |
         brew install libomp
+        # Set up environment for OpenMP on macOS
+        echo "LDFLAGS=-L/usr/local/opt/libomp/lib" >> $GITHUB_ENV
+        echo "CPPFLAGS=-I/usr/local/opt/libomp/include" >> $GITHUB_ENV
+        echo "CFLAGS=-I/usr/local/opt/libomp/include" >> $GITHUB_ENV
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -124,6 +128,10 @@ jobs:
     - name: Install dependencies
       run: |
         brew install libomp
+        # Set up environment for OpenMP on macOS
+        echo "LDFLAGS=-L/opt/homebrew/opt/libomp/lib" >> $GITHUB_ENV
+        echo "CPPFLAGS=-I/opt/homebrew/opt/libomp/include" >> $GITHUB_ENV
+        echo "CFLAGS=-I/opt/homebrew/opt/libomp/include" >> $GITHUB_ENV
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
