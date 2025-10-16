@@ -1,6 +1,6 @@
 // extern crate bindgen;
 
-use std::{path::PathBuf, process::Command};
+use std::{env, path::PathBuf, process::Command};
 
 struct BuildPaths {
     wfa_src: PathBuf,
@@ -26,8 +26,33 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         return Err("WFA2-lib/Makefile not found. Make sure the submodule is initialized.".into());
     }
 
-    // Build WFA2-lib in place
-    let output = Command::new("make")
+    // Detect platform and set appropriate compiler flags
+    let target = env::var("TARGET").unwrap_or_default();
+    let mut make_cmd = Command::new("make");
+    
+    // Handle platform-specific flags
+    if target.contains("apple") || cfg!(target_os = "macos") {
+        // For Apple Silicon/macOS, use mcpu=apple-m1 or generic flags
+        if target.contains("aarch64") {
+            // Apple Silicon M1/M2/M3
+            make_cmd.env("CFLAGS", "-O3 -mcpu=apple-m1");
+        } else {
+            // Intel Mac
+            make_cmd.env("CFLAGS", "-O3 -mtune=native");
+        }
+    } else if target.contains("x86_64") {
+        // x86_64 Linux/Windows
+        make_cmd.env("CFLAGS", "-O3 -march=native");
+    } else if target.contains("aarch64") || target.contains("arm") {
+        // ARM Linux
+        make_cmd.env("CFLAGS", "-O3 -mcpu=native");
+    } else {
+        // Fallback to generic optimization
+        make_cmd.env("CFLAGS", "-O3");
+    }
+    
+    // Clean and build
+    let output = make_cmd
         .args(["clean", "all"])
         .current_dir(&paths.wfa_src)
         .output()?;
@@ -45,7 +70,14 @@ fn setup_linking() {
 
     // Link the WFA library
     println!("cargo:rustc-link-lib=static=wfa");
-    println!("cargo:rustc-link-lib=gomp");
+    
+    // On macOS, link against libomp instead of libgomp
+    let target = env::var("TARGET").unwrap_or_default();
+    if target.contains("apple") || cfg!(target_os = "macos") {
+        println!("cargo:rustc-link-lib=omp");
+    } else {
+        println!("cargo:rustc-link-lib=gomp");
+    }
 
     // Set library search path
     println!(
