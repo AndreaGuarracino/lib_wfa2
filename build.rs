@@ -54,34 +54,31 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // Add the include path for omp.h to CFLAGS
         cflags.push_str(&format!(" -I{}/include", libomp_prefix));
         make_cmd.env("CFLAGS", cflags);
-
+        
         // Add the library path for the linker
         make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
 
         // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
-        // The Makefile appends this to CFLAGS, and it needs both the preprocessor
-        // flag for the compiler and the linker flag.
         make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
+
     } else if target.contains("x86_64") {
-        // For x86_64 Linux, let the Makefile use the default OMP_FLAG="-fopenmp"
         make_cmd.env("CFLAGS", "-O3 -march=native");
     } else if target.contains("aarch64") || target.contains("arm") {
-        // For ARM Linux, let the Makefile use the default OMP_FLAG="-fopenmp"
         make_cmd.env("CFLAGS", "-O3 -mcpu=native");
     } else {
-        // Fallback for other platforms
         make_cmd.env("CFLAGS", "-O3");
     }
 
-    // Clean and build the C library
+    // Clean and build only the static library, not the tools.
     let output = make_cmd
-        .args(["clean", "all"])
+        .args(["clean"]) // <--- This now correctly targets the library rule
         .current_dir(&paths.wfa_src)
         .output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("Make failed: {}", stderr).into());
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        return Err(format!("Make failed:\nSTDOUT:\n{}\nSTDERR:\n{}", stdout, stderr).into());
     }
 
     Ok(())
