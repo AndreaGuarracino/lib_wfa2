@@ -97,12 +97,26 @@ fn setup_linking() {
     // On macOS, link against libomp instead of libgomp for the final Rust binary
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("apple") || cfg!(target_os = "macos") {
+        // Find libomp from Homebrew and add its lib path for rustc to find.
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()
+                .expect("Failed to execute brew command to find libomp")
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
+        println!("cargo:rustc-link-search=native={}/lib", libomp_prefix);
+
         println!("cargo:rustc-link-lib=omp");
     } else {
         println!("cargo:rustc-link-lib=gomp");
     }
 
-    // Set library search path
+    // Set library search path for WFA
     println!(
         "cargo:rustc-link-search=native={}",
         paths.wfa_lib_dir().display()
