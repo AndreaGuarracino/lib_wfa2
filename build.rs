@@ -48,63 +48,42 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
     let target = env::var("TARGET").unwrap_or_default();
     let mut make_cmd = Command::new("make");
 
-    // Always set the compiler explicitly to override Makefile defaults
-    make_cmd.env("CC", env::var("CC").unwrap_or_else(|_| "clang".to_string()));
-    make_cmd.env("CXX", env::var("CXX").unwrap_or_else(|_| "clang++".to_string()));
-
     // Handle platform-specific flags
     if target.contains("apple") || cfg!(target_os = "macos") {
-        // Base CFLAGS for the target architecture - avoid -march=native on macOS
+        // Base CFLAGS for the target architecture
         let mut cflags = if target.contains("aarch64") {
-            "-O3".to_string() // Simplified flags to avoid compatibility issues
+            "-O3 -mcpu=apple-m1".to_string()
         } else {
-            "-O3".to_string() // Simplified flags for Intel Macs too
+            "-O3 -mtune=native".to_string()
         };
 
         // On macOS, find libomp installed by Homebrew to get correct paths
-        let libomp_result = Command::new("brew")
-            .arg("--prefix")
-            .arg("libomp")
-            .output();
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()?
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
 
-        if let Ok(output) = libomp_result {
-            if output.status.success() {
-                let libomp_prefix = String::from_utf8(output.stdout)
-                    .unwrap()
-                    .trim()
-                    .to_string();
+        // Add the include path for omp.h to CFLAGS
+        cflags.push_str(&format!(" -I{}/include", libomp_prefix));
+        make_cmd.env("CFLAGS", cflags);
 
-                // Add the include path for omp.h to CFLAGS
-                cflags.push_str(&format!(" -I{}/include", libomp_prefix));
-                
-                // Add the library path for the linker
-                make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
+        // Add the library path for the linker
+        make_cmd.env("LDFLAGS", format!("-L{}/lib", libomp_prefix));
 
-                // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
-                make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
-            } else {
-                // Fallback if libomp is not found via brew
-                eprintln!("Warning: Could not find libomp via brew, proceeding without OpenMP");
-            }
-        } else {
-            // Fallback if brew command fails
-            eprintln!("Warning: brew command failed, proceeding without OpenMP detection");
-        }
-
-        make_cmd.env("CFLAGS", &cflags);
-        make_cmd.env("CXXFLAGS", &cflags);
+        // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
+        make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
     } else if target.contains("x86_64") {
-        let flags = "-O3";
-        make_cmd.env("CFLAGS", flags);
-        make_cmd.env("CXXFLAGS", flags);
+        make_cmd.env("CFLAGS", "-O3 -march=native");
     } else if target.contains("aarch64") || target.contains("arm") {
-        let flags = "-O3";
-        make_cmd.env("CFLAGS", flags);
-        make_cmd.env("CXXFLAGS", flags);
+        make_cmd.env("CFLAGS", "-O3 -mcpu=native");
     } else {
-        let flags = "-O3";
-        make_cmd.env("CFLAGS", flags);
-        make_cmd.env("CXXFLAGS", flags);
+        make_cmd.env("CFLAGS", "-O3");
     }
 
     // Disable building examples and tools
@@ -137,26 +116,20 @@ fn setup_linking() {
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("apple") || cfg!(target_os = "macos") {
         // Find libomp from Homebrew and add its lib path for rustc to find.
-        let libomp_result = Command::new("brew")
-            .arg("--prefix")
-            .arg("libomp")
-            .output();
+        let libomp_prefix = String::from_utf8(
+            Command::new("brew")
+                .arg("--prefix")
+                .arg("libomp")
+                .output()
+                .expect("Failed to execute brew command to find libomp")
+                .stdout,
+        )
+        .unwrap()
+        .trim()
+        .to_string();
+        println!("cargo:rustc-link-search=native={}/lib", libomp_prefix);
 
-        if let Ok(output) = libomp_result {
-            if output.status.success() {
-                let libomp_prefix = String::from_utf8(output.stdout)
-                    .unwrap()
-                    .trim()
-                    .to_string();
-                
-                println!("cargo:rustc-link-search=native={}/lib", libomp_prefix);
-                println!("cargo:rustc-link-lib=omp");
-            } else {
-                eprintln!("Warning: Could not find libomp via brew, skipping OpenMP linking");
-            }
-        } else {
-            eprintln!("Warning: brew command failed, skipping OpenMP linking");
-        }
+        println!("cargo:rustc-link-lib=omp");
     } else {
         println!("cargo:rustc-link-lib=gomp");
     }
