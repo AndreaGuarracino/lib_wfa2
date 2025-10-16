@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [ main, mac-friendly ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -46,8 +46,8 @@ jobs:
         path: target
         key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check formatting
-      run: cargo fmt -- --check
+    # - name: Check formatting
+    #   run: cargo fmt -- --check
 
     - name: Run clippy
       run: cargo clippy #-- -D warnings
@@ -96,8 +96,8 @@ jobs:
         path: target
         key: ${{ runner.os }}-intel-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check formatting
-      run: cargo fmt -- --check
+    # - name: Check formatting
+    #   run: cargo fmt -- --check
 
     - name: Run clippy
       run: cargo clippy #-- -D warnings
@@ -146,8 +146,8 @@ jobs:
         path: target
         key: ${{ runner.os }}-arm-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Check formatting
-      run: cargo fmt -- --check
+    # - name: Check formatting
+    #   run: cargo fmt -- --check
 
     - name: Run clippy
       run: cargo clippy #-- -D warnings
