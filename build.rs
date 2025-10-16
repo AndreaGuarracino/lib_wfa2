@@ -71,7 +71,7 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
     // Disable building examples and tools
     make_cmd.env("BUILD_EXAMPLES", "0");
     make_cmd.env("BUILD_TOOLS", "0");
-    make_cmd.env("BUILD_WFA_PARALLEL", "0");
+    //make_cmd.env("BUILD_WFA_PARALLEL", "0");
 
     // Clean and build only the static library, not the tools.
     let output = make_cmd
