@@ -465,15 +465,16 @@ impl AffineWavefronts {
         }
     }
 
-    pub fn set_memory_mode(&mut self, mode: MemoryMode) {
-        (unsafe { *self.wf_aligner }).memory_mode = match mode {
-            MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
-            MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
-            MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
-            MemoryMode::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
-            MemoryMode::Undefined => panic!("Cannot set Undefined memory mode!"),
-        }
-    }
+    // Not exposing this for now, better to set memory mode at creation time.
+    // pub fn set_memory_mode(&mut self, mode: MemoryMode) {
+    //     (unsafe { *self.wf_aligner }).memory_mode = match mode {
+    //         MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
+    //         MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
+    //         MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
+    //         MemoryMode::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
+    //         MemoryMode::Undefined => panic!("Cannot set Undefined memory mode!"),
+    //     }
+    // }
 
     pub fn get_memory_mode(&self) -> MemoryMode {
         let a = unsafe { *self.aligner() };
