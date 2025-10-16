@@ -29,7 +29,7 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
     // Detect platform and set appropriate compiler flags
     let target = env::var("TARGET").unwrap_or_default();
     let mut make_cmd = Command::new("make");
-    
+
     // Handle platform-specific flags
     if target.contains("apple") || cfg!(target_os = "macos") {
         // For Apple Silicon/macOS, use mcpu=apple-m1 or generic flags
@@ -50,7 +50,7 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // Fallback to generic optimization
         make_cmd.env("CFLAGS", "-O3");
     }
-    
+
     // Clean and build
     let output = make_cmd
         .args(["clean", "all"])
@@ -70,7 +70,7 @@ fn setup_linking() {
 
     // Link the WFA library
     println!("cargo:rustc-link-lib=static=wfa");
-    
+
     // On macOS, link against libomp instead of libgomp
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("apple") || cfg!(target_os = "macos") {
