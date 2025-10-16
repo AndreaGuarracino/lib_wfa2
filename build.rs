@@ -33,12 +33,29 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
     // Handle platform-specific flags
     if target.contains("apple") || cfg!(target_os = "macos") {
         // For Apple Silicon/macOS, use mcpu=apple-m1 or generic flags
-        if target.contains("aarch64") {
+        let mut cflags = if target.contains("aarch64") {
             // Apple Silicon M1/M2/M3
-            make_cmd.env("CFLAGS", "-O3 -mcpu=apple-m1");
+            String::from("-O3 -mcpu=apple-m1")
         } else {
             // Intel Mac
-            make_cmd.env("CFLAGS", "-O3 -mtune=native");
+            String::from("-O3 -mtune=native")
+        };
+
+        // Add OpenMP include path if set in environment
+        if let Ok(cppflags) = env::var("CPPFLAGS") {
+            cflags.push(' ');
+            cflags.push_str(&cppflags);
+        }
+        if let Ok(extra_cflags) = env::var("CFLAGS") {
+            cflags.push(' ');
+            cflags.push_str(&extra_cflags);
+        }
+
+        make_cmd.env("CFLAGS", cflags);
+
+        // Pass LDFLAGS for linking
+        if let Ok(ldflags) = env::var("LDFLAGS") {
+            make_cmd.env("LDFLAGS", ldflags);
         }
     } else if target.contains("x86_64") {
         // x86_64 Linux/Windows
@@ -75,6 +92,15 @@ fn setup_linking() {
     let target = env::var("TARGET").unwrap_or_default();
     if target.contains("apple") || cfg!(target_os = "macos") {
         println!("cargo:rustc-link-lib=omp");
+
+        // Add libomp library path based on architecture
+        if target.contains("aarch64") {
+            // Apple Silicon - Homebrew uses /opt/homebrew
+            println!("cargo:rustc-link-search=native=/opt/homebrew/opt/libomp/lib");
+        } else {
+            // Intel Mac - Homebrew uses /usr/local
+            println!("cargo:rustc-link-search=native=/usr/local/opt/libomp/lib");
+        }
     } else {
         println!("cargo:rustc-link-lib=gomp");
     }
