@@ -295,7 +295,7 @@ impl AffineWavefronts {
             attributes.affine2p_penalties.gap_extension2 = -1;
 
             // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high;
+            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
 
             // Disable heuristic
             attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
@@ -521,6 +521,13 @@ impl AffineWavefronts {
         unsafe {
             let cigar = (*self.wf_aligner).cigar;
             (*cigar).score
+        }
+    }
+
+    /// Reclaims any extra buffers the underlying WFA aligner grew during the last run.
+    pub fn clear(&mut self) {
+        unsafe {
+            wfa::wavefront_aligner_reap(self.wf_aligner);
         }
     }
 
