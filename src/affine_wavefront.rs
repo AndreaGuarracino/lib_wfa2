@@ -3,6 +3,11 @@ use wfa::wavefront_aligner_set_max_alignment_steps;
 use crate::bindings::*;
 use core::slice;
 
+#[derive(Debug, Clone, Copy)]
+pub struct AlignerStats {
+    pub memory_bytes: u64,
+}
+
 #[derive(Debug, Clone)]
 pub enum DistanceMetric {
     Indel,
@@ -546,6 +551,15 @@ impl AffineWavefronts {
             .into();
 
             alignment_status
+        }
+    }
+
+    /// Report statistics about the underlying WFA aligner.
+    pub fn stats(&self) -> AlignerStats {
+        unsafe {
+            AlignerStats {
+                memory_bytes: wfa::wavefront_aligner_get_size(self.wf_aligner),
+            }
         }
     }
 }
