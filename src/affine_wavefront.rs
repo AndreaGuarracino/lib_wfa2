@@ -1,17 +1,21 @@
 use crate::bindings::*;
 use core::slice;
 
-#[derive(Debug, Clone, Copy)]
-pub struct AlignerStats {
-    pub memory_bytes: u64,
-}
-
 #[derive(Debug, Clone)]
-pub enum DistanceMetric {
-    Indel,
+pub enum Distance {
     Edit,
-    GapAffine,
-    GapAffine2p,
+    GapAffine {
+        mismatch: i32,
+        gap_opening: i32,
+        gap_extension: i32,
+    },
+    GapAffine2p {
+        mismatch: i32,
+        gap_opening1: i32,
+        gap_extension1: i32,
+        gap_opening2: i32,
+        gap_extension2: i32,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -172,49 +176,102 @@ impl AffineWavefronts {
         self.wf_aligner
     }
 
+    fn set_distance(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        mode: &Distance,
+    ) {
+        // Match penalty is always 0
+        attributes.affine2p_penalties.match_ = 0;
+
+        match mode {
+            Distance::Edit => {
+                attributes.distance_metric = wfa::distance_metric_t_edit;
+            }
+            Distance::GapAffine { mismatch, gap_opening, gap_extension } => {
+                attributes.distance_metric = wfa::distance_metric_t_gap_affine;
+                attributes.affine_penalties.mismatch = *mismatch;
+                attributes.affine_penalties.gap_opening = *gap_opening;
+                attributes.affine_penalties.gap_extension = *gap_extension;
+            }
+            Distance::GapAffine2p { mismatch, gap_opening1, gap_extension1, gap_opening2, gap_extension2 } => {
+                attributes.distance_metric = wfa::distance_metric_t_gap_affine_2p;
+                attributes.affine2p_penalties.mismatch = *mismatch;
+                attributes.affine2p_penalties.gap_opening1 = *gap_opening1;
+                attributes.affine2p_penalties.gap_extension1 = *gap_extension1;
+                attributes.affine2p_penalties.gap_opening2 = *gap_opening2;
+                attributes.affine2p_penalties.gap_extension2 = *gap_extension2;
+            }
+        }
+    }
+
+    fn set_heuristic(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        heuristic: Option<&HeuristicStrategy>,
+    ) {
+        match heuristic {
+            Some(HeuristicStrategy::BandedStatic { band_min_k, band_max_k }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_banded_static;
+                attributes.heuristic.min_k = *band_min_k;
+                attributes.heuristic.max_k = *band_max_k;
+            }
+            Some(HeuristicStrategy::BandedAdaptive { band_min_k, band_max_k, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_banded_adaptive;
+                attributes.heuristic.min_k = *band_min_k;
+                attributes.heuristic.max_k = *band_max_k;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::WFAdaptive { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfadaptive;
+                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
+                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::XDrop { xdrop, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_xdrop;
+                attributes.heuristic.xdrop = *xdrop;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::ZDrop { zdrop, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_zdrop;
+                attributes.heuristic.zdrop = *zdrop;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::WFMash { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfmash;
+                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
+                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::None) | _ => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            }
+        }
+    }
+
     pub fn new_aligner_edit(
-        match_: i32,
-        mismatch: i32,
-        gap_opening1: i32,
         heuristic: Option<&HeuristicStrategy>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
-            // Set distance metric
-            attributes.distance_metric = wfa::distance_metric_t_edit;
-
-            // Set penalties
-            attributes.affine2p_penalties.match_ = match_;
-            attributes.affine2p_penalties.mismatch = mismatch;
-            attributes.affine2p_penalties.gap_opening1 = gap_opening1;
-            attributes.affine2p_penalties.gap_extension1 = -1;
-            attributes.affine2p_penalties.gap_opening2 = -1;
-            attributes.affine2p_penalties.gap_extension2 = -1;
+            // Set distance mode (includes distance metric and penalties)
+            Self::set_distance(&mut attributes, &Distance::Edit);
 
             // Set memory mode
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
 
-            // Disable heuristic
-            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            // Configure heuristic before creating aligner
+            Self::set_heuristic(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            let mut aligner = Self { wf_aligner };
-
-            // Apply heuristic if provided
-            if let Some(h) = heuristic {
-                aligner.set_heuristic(h);
-            }
-
-            aligner
+            Self { wf_aligner }
         }
     }
 
-    pub fn new_aligner_gap_affine(
-        match_: i32,
+    pub fn  new_aligner_gap_affine(
         mismatch: i32,
         gap_opening: i32,
         gap_extension: i32,
@@ -224,39 +281,30 @@ impl AffineWavefronts {
             // Create attributes and set defaults
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
-            // Set distance metric
-            attributes.distance_metric = wfa::distance_metric_t_gap_affine;
-
-            // Set penalties
-            attributes.affine2p_penalties.match_ = match_;
-            attributes.affine2p_penalties.mismatch = mismatch;
-            attributes.affine2p_penalties.gap_opening1 = gap_opening;
-            attributes.affine2p_penalties.gap_extension1 = gap_extension;
-            attributes.affine2p_penalties.gap_opening2 = -1;
-            attributes.affine2p_penalties.gap_extension2 = -1;
+            // Set distance mode (includes distance metric and penalties)
+            Self::set_distance(
+                &mut attributes,
+                &Distance::GapAffine {
+                    mismatch,
+                    gap_opening,
+                    gap_extension,
+                },
+            );
 
             // Set memory mode
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
 
-            // Disable heuristic
-            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            // Configure heuristic before creating aligner
+            Self::set_heuristic(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            let mut aligner = Self { wf_aligner };
-
-            // Apply heuristic if provided
-            if let Some(h) = heuristic {
-                aligner.set_heuristic(h);
-            }
-
-            aligner
+            Self { wf_aligner }
         }
     }
 
     pub fn new_aligner_gap_affine2p(
-        match_: i32,
         mismatch: i32,
         gap_opening1: i32,
         gap_extension1: i32,
@@ -268,34 +316,28 @@ impl AffineWavefronts {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
-            // Set distance metric
-            attributes.distance_metric = wfa::distance_metric_t_gap_affine_2p;
-
-            // Set penalties
-            attributes.affine2p_penalties.match_ = match_;
-            attributes.affine2p_penalties.mismatch = mismatch;
-            attributes.affine2p_penalties.gap_opening1 = gap_opening1;
-            attributes.affine2p_penalties.gap_extension1 = gap_extension1;
-            attributes.affine2p_penalties.gap_opening2 = gap_opening2;
-            attributes.affine2p_penalties.gap_extension2 = gap_extension2;
+            // Set distance mode (includes distance metric and penalties)
+            Self::set_distance(
+                &mut attributes,
+                &Distance::GapAffine2p {
+                    mismatch,
+                    gap_opening1,
+                    gap_extension1,
+                    gap_opening2,
+                    gap_extension2,
+                },
+            );
 
             // Set memory mode
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
 
-            // Disable heuristic
-            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            // Configure heuristic before creating aligner
+            Self::set_heuristic(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            let mut aligner = Self { wf_aligner };
-
-            // Apply heuristic if provided
-            if let Some(h) = heuristic {
-                aligner.set_heuristic(h);
-            }
-
-            aligner
+            Self { wf_aligner }
         }
     }
 
@@ -350,84 +392,10 @@ impl AffineWavefronts {
         }
     }
 
-    /// Report the size of the underlying WFA aligner.
-    pub fn stats(&self) -> AlignerStats {
+    /// Report the size of the underlying WFA aligner in bytes.
+    pub fn get_size(&self) -> u64 {
         unsafe {
-            AlignerStats {
-                memory_bytes: wfa::wavefront_aligner_get_size(self.wf_aligner),
-            }
-        }
-    }
-
-    pub fn get_distance_metric(&self) -> DistanceMetric {
-        unsafe {
-            match (*self.wf_aligner).penalties.distance_metric {
-                m if m == wfa::distance_metric_t_indel => DistanceMetric::Indel,
-                m if m == wfa::distance_metric_t_edit => DistanceMetric::Edit,
-                m if m == wfa::distance_metric_t_gap_affine => DistanceMetric::GapAffine,
-                m if m == wfa::distance_metric_t_gap_affine_2p => DistanceMetric::GapAffine2p,
-                _ => DistanceMetric::GapAffine, // Default to gap-affine
-            }
-        }
-    }
-
-    fn set_heuristic(&mut self, heuristic: &HeuristicStrategy) {
-        match *heuristic {
-            HeuristicStrategy::None => unsafe {
-                wfa::wavefront_aligner_set_heuristic_none(self.wf_aligner)
-            },
-            HeuristicStrategy::BandedStatic {
-                band_min_k,
-                band_max_k,
-            } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_banded_static(
-                    self.wf_aligner,
-                    band_min_k,
-                    band_max_k,
-                )
-            },
-            HeuristicStrategy::BandedAdaptive {
-                band_min_k,
-                band_max_k,
-                score_steps,
-            } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_banded_adaptive(
-                    self.wf_aligner,
-                    band_min_k,
-                    band_max_k,
-                    score_steps,
-                )
-            },
-            HeuristicStrategy::WFAdaptive {
-                min_wavefront_length,
-                max_distance_threshold,
-                score_steps,
-            } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_wfadaptive(
-                    self.wf_aligner,
-                    min_wavefront_length,
-                    max_distance_threshold,
-                    score_steps,
-                )
-            },
-            HeuristicStrategy::XDrop { xdrop, score_steps } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_xdrop(self.wf_aligner, xdrop, score_steps)
-            },
-            HeuristicStrategy::ZDrop { zdrop, score_steps } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_zdrop(self.wf_aligner, zdrop, score_steps)
-            },
-            HeuristicStrategy::WFMash {
-                min_wavefront_length,
-                max_distance_threshold,
-                score_steps,
-            } => unsafe {
-                wfa::wavefront_aligner_set_heuristic_wfmash(
-                    self.wf_aligner,
-                    min_wavefront_length,
-                    max_distance_threshold,
-                    score_steps,
-                )
-            },
+            wfa::wavefront_aligner_get_size(self.wf_aligner)
         }
     }
 
@@ -478,8 +446,11 @@ impl AffineWavefronts {
         hs
     }
 
-    fn set_alignment_scope(&mut self, scope: AlignmentScope) {
-        (unsafe { *self.wf_aligner }).alignment_scope = match scope {
+    fn set_alignment_scope(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        scope: AlignmentScope,
+    ) {
+        attributes.alignment_scope = match scope {
             AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
             AlignmentScope::Alignment => wfa::alignment_scope_t_compute_alignment,
             AlignmentScope::Undefined => panic!("Cannot set an undefined scope"),
@@ -491,11 +462,17 @@ impl AffineWavefronts {
         AlignmentScope::from_scope(a.alignment_scope)
     }
 
-    fn set_alignment_span(&mut self, span: AlignmentSpan) {
-        let _form: &mut wfa::alignment_form_t = &mut (unsafe { *self.wf_aligner }).alignment_form;
+    fn set_alignment_span(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        span: AlignmentSpan,
+    ) {
         match span {
             AlignmentSpan::End2End => {
-                unsafe { wfa::wavefront_aligner_set_alignment_end_to_end(self.wf_aligner) };
+                attributes.alignment_form.span = wfa::alignment_span_t_alignment_end2end;
+                attributes.alignment_form.pattern_begin_free = 0;
+                attributes.alignment_form.pattern_end_free = 0;
+                attributes.alignment_form.text_begin_free = 0;
+                attributes.alignment_form.text_end_free = 0;
             }
             AlignmentSpan::EndsFree {
                 pattern_begin_free,
@@ -503,15 +480,11 @@ impl AffineWavefronts {
                 text_begin_free,
                 text_end_free,
             } => {
-                unsafe {
-                    wfa::wavefront_aligner_set_alignment_free_ends(
-                        self.wf_aligner,
-                        pattern_begin_free,
-                        pattern_end_free,
-                        text_begin_free,
-                        text_end_free,
-                    )
-                };
+                attributes.alignment_form.span = wfa::alignment_span_t_alignment_endsfree;
+                attributes.alignment_form.pattern_begin_free = pattern_begin_free;
+                attributes.alignment_form.pattern_end_free = pattern_end_free;
+                attributes.alignment_form.text_begin_free = text_begin_free;
+                attributes.alignment_form.text_end_free = text_end_free;
             }
             AlignmentSpan::Undefined => (),
         }
@@ -522,8 +495,11 @@ impl AffineWavefronts {
         AlignmentSpan::from_form(form)
     }
 
-    fn set_memory_mode(&mut self, mode: MemoryMode) {
-        (unsafe { *self.wf_aligner }).memory_mode = match mode {
+    fn set_memory_mode(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        mode: MemoryMode,
+    ) {
+        attributes.memory_mode = match mode {
             MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
             MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
             MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
