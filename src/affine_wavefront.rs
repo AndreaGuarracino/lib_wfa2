@@ -185,7 +185,7 @@ impl AffineWavefronts {
             Self::set_distance(&mut attributes, &Distance::Edit);
 
             // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
+            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
             Self::set_heuristic(&mut attributes, heuristic);
@@ -218,7 +218,7 @@ impl AffineWavefronts {
             );
 
             // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
+            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
             Self::set_heuristic(&mut attributes, heuristic);
@@ -255,7 +255,7 @@ impl AffineWavefronts {
             );
 
             // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_ultralow;
+            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
             Self::set_heuristic(&mut attributes, heuristic);
@@ -324,9 +324,6 @@ impl AffineWavefronts {
     }
 
     fn set_distance(attributes: &mut wfa::wavefront_aligner_attr_t, mode: &Distance) {
-        // Match penalty is always 0
-        attributes.affine2p_penalties.match_ = 0;
-
         match mode {
             Distance::Edit => {
                 attributes.distance_metric = wfa::distance_metric_t_edit;
