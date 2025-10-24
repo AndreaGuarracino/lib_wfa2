@@ -176,6 +176,7 @@ impl AffineWavefronts {
         match_: i32,
         mismatch: i32,
         gap_opening1: i32,
+        heuristic: Option<&HeuristicStrategy>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
@@ -201,15 +202,23 @@ impl AffineWavefronts {
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            Self { wf_aligner }
+            let mut aligner = Self { wf_aligner };
+
+            // Apply heuristic if provided
+            if let Some(h) = heuristic {
+                aligner.set_heuristic(h);
+            }
+
+            aligner
         }
     }
 
-    pub fn  new_aligner_gap_affine(
+    pub fn new_aligner_gap_affine(
         match_: i32,
         mismatch: i32,
         gap_opening: i32,
         gap_extension: i32,
+        heuristic: Option<&HeuristicStrategy>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults
@@ -235,7 +244,14 @@ impl AffineWavefronts {
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            Self { wf_aligner }
+            let mut aligner = Self { wf_aligner };
+
+            // Apply heuristic if provided
+            if let Some(h) = heuristic {
+                aligner.set_heuristic(h);
+            }
+
+            aligner
         }
     }
 
@@ -246,6 +262,7 @@ impl AffineWavefronts {
         gap_extension1: i32,
         gap_opening2: i32,
         gap_extension2: i32,
+        heuristic: Option<&HeuristicStrategy>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
@@ -271,7 +288,74 @@ impl AffineWavefronts {
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
 
-            Self { wf_aligner }
+            let mut aligner = Self { wf_aligner };
+
+            // Apply heuristic if provided
+            if let Some(h) = heuristic {
+                aligner.set_heuristic(h);
+            }
+
+            aligner
+        }
+    }
+
+    /// Align two sequences and return the alignment status.
+    pub fn align(&self, a: &[u8], b: &[u8]) -> AlignmentStatus {
+        unsafe {
+            let a = slice::from_raw_parts(a.as_ptr() as *const i8, a.len());
+            let b = slice::from_raw_parts(b.as_ptr() as *const i8, b.len());
+
+            let alignment_status: AlignmentStatus = wfa::wavefront_align(
+                self.wf_aligner,
+                a.as_ptr(),
+                a.len() as i32,
+                b.as_ptr(),
+                b.len() as i32,
+            )
+            .into();
+
+            alignment_status
+        }
+    }
+
+    /// Returns the CIGAR string from the last alignment.
+    pub fn cigar(&self) -> &[u8] {
+        unsafe {
+            let cigar = (*self.wf_aligner).cigar;
+            let ops = (*cigar).operations;
+            let begin_offset = (*cigar).begin_offset;
+            let end_offset = (*cigar).end_offset;
+            let length = end_offset - begin_offset;
+
+            let cigar_slice: &[u8] = std::slice::from_raw_parts(
+                (ops as *const u8).add(begin_offset as usize),
+                length.try_into().unwrap(),
+            );
+            cigar_slice
+        }
+    }
+
+    /// Returns the alignment score from the last alignment.
+    pub fn score(&self) -> i32 {
+        unsafe {
+            let cigar = (*self.wf_aligner).cigar;
+            (*cigar).score
+        }
+    }
+
+    /// Reclaims any extra buffers the underlying WFA aligner grew during the last run.
+    pub fn clear(&mut self) {
+        unsafe {
+            wfa::wavefront_aligner_reap(self.wf_aligner);
+        }
+    }
+
+    /// Report the size of the underlying WFA aligner.
+    pub fn stats(&self) -> AlignerStats {
+        unsafe {
+            AlignerStats {
+                memory_bytes: wfa::wavefront_aligner_get_size(self.wf_aligner),
+            }
         }
     }
 
@@ -287,7 +371,7 @@ impl AffineWavefronts {
         }
     }
 
-    pub fn set_heuristic(&mut self, heuristic: &HeuristicStrategy) {
+    fn set_heuristic(&mut self, heuristic: &HeuristicStrategy) {
         match *heuristic {
             HeuristicStrategy::None => unsafe {
                 wfa::wavefront_aligner_set_heuristic_none(self.wf_aligner)
@@ -394,122 +478,62 @@ impl AffineWavefronts {
         hs
     }
 
-    // Better to set this at creation time.
-    // pub fn set_alignment_scope(&mut self, scope: AlignmentScope) {
-    //     (unsafe { *self.wf_aligner }).alignment_scope = match scope {
-    //         AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
-    //         AlignmentScope::Alignment => wfa::alignment_scope_t_compute_alignment,
-    //         AlignmentScope::Undefined => panic!("Cannot set an undefined scope"),
-    //     }
-    // }
+    fn set_alignment_scope(&mut self, scope: AlignmentScope) {
+        (unsafe { *self.wf_aligner }).alignment_scope = match scope {
+            AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
+            AlignmentScope::Alignment => wfa::alignment_scope_t_compute_alignment,
+            AlignmentScope::Undefined => panic!("Cannot set an undefined scope"),
+        }
+    }
 
     pub fn get_alignment_scope(&self) -> AlignmentScope {
         let a = unsafe { *self.wf_aligner };
         AlignmentScope::from_scope(a.alignment_scope)
     }
 
-    // Better to set this at creation time.
-    // pub fn set_alignment_span(&mut self, span: AlignmentSpan) {
-    //     let _form: &mut wfa::alignment_form_t = &mut (unsafe { *self.wf_aligner }).alignment_form;
-    //     match span {
-    //         AlignmentSpan::End2End => {
-    //             unsafe { wfa::wavefront_aligner_set_alignment_end_to_end(self.wf_aligner) };
-    //         }
-    //         AlignmentSpan::EndsFree {
-    //             pattern_begin_free,
-    //             pattern_end_free,
-    //             text_begin_free,
-    //             text_end_free,
-    //         } => {
-    //             unsafe {
-    //                 wfa::wavefront_aligner_set_alignment_free_ends(
-    //                     self.wf_aligner,
-    //                     pattern_begin_free,
-    //                     pattern_end_free,
-    //                     text_begin_free,
-    //                     text_end_free,
-    //                 )
-    //             };
-    //         }
-    //         AlignmentSpan::Undefined => (),
-    //     }
-    // }
+    fn set_alignment_span(&mut self, span: AlignmentSpan) {
+        let _form: &mut wfa::alignment_form_t = &mut (unsafe { *self.wf_aligner }).alignment_form;
+        match span {
+            AlignmentSpan::End2End => {
+                unsafe { wfa::wavefront_aligner_set_alignment_end_to_end(self.wf_aligner) };
+            }
+            AlignmentSpan::EndsFree {
+                pattern_begin_free,
+                pattern_end_free,
+                text_begin_free,
+                text_end_free,
+            } => {
+                unsafe {
+                    wfa::wavefront_aligner_set_alignment_free_ends(
+                        self.wf_aligner,
+                        pattern_begin_free,
+                        pattern_end_free,
+                        text_begin_free,
+                        text_end_free,
+                    )
+                };
+            }
+            AlignmentSpan::Undefined => (),
+        }
+    }
 
     pub fn get_alignment_span(&self) -> AlignmentSpan {
         let form = unsafe { *self.aligner() }.alignment_form;
         AlignmentSpan::from_form(form)
     }
 
-    // Better to set this at creation time.
-    // pub fn set_memory_mode(&mut self, mode: MemoryMode) {
-    //     (unsafe { *self.wf_aligner }).memory_mode = match mode {
-    //         MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
-    //         MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
-    //         MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
-    //         MemoryMode::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
-    //         MemoryMode::Undefined => panic!("Cannot set Undefined memory mode!"),
-    //     }
-    // }
+    fn set_memory_mode(&mut self, mode: MemoryMode) {
+        (unsafe { *self.wf_aligner }).memory_mode = match mode {
+            MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
+            MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
+            MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
+            MemoryMode::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
+            MemoryMode::Undefined => panic!("Cannot set Undefined memory mode!"),
+        }
+    }
 
     pub fn get_memory_mode(&self) -> MemoryMode {
         let a = unsafe { *self.aligner() };
         MemoryMode::from_value(a.memory_mode)
-    }
-
-    pub fn cigar(&self) -> &[u8] {
-        unsafe {
-            let cigar = (*self.wf_aligner).cigar;
-            let ops = (*cigar).operations;
-            let begin_offset = (*cigar).begin_offset;
-            let end_offset = (*cigar).end_offset;
-            let length = end_offset - begin_offset;
-
-            let cigar_slice: &[u8] = std::slice::from_raw_parts(
-                (ops as *const u8).add(begin_offset as usize),
-                length.try_into().unwrap(),
-            );
-            cigar_slice
-        }
-    }
-
-    pub fn score(&self) -> i32 {
-        unsafe {
-            let cigar = (*self.wf_aligner).cigar;
-            (*cigar).score
-        }
-    }
-
-    /// Reclaims any extra buffers the underlying WFA aligner grew during the last run.
-    pub fn clear(&mut self) {
-        unsafe {
-            wfa::wavefront_aligner_reap(self.wf_aligner);
-        }
-    }
-
-    pub fn align(&self, a: &[u8], b: &[u8]) -> AlignmentStatus {
-        unsafe {
-            let a = slice::from_raw_parts(a.as_ptr() as *const i8, a.len());
-            let b = slice::from_raw_parts(b.as_ptr() as *const i8, b.len());
-
-            let alignment_status: AlignmentStatus = wfa::wavefront_align(
-                self.wf_aligner,
-                a.as_ptr(),
-                a.len() as i32,
-                b.as_ptr(),
-                b.len() as i32,
-            )
-            .into();
-
-            alignment_status
-        }
-    }
-
-    /// Report statistics about the underlying WFA aligner.
-    pub fn stats(&self) -> AlignerStats {
-        unsafe {
-            AlignerStats {
-                memory_bytes: wfa::wavefront_aligner_get_size(self.wf_aligner),
-            }
-        }
     }
 }
