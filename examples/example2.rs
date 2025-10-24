@@ -1,10 +1,10 @@
-use lib_wfa2::affine_wavefront::{AffineWavefronts, HeuristicStrategy};
+use lib_wfa2::affine_wavefront::{Distance, HeuristicStrategy};
 
 pub fn main() {
     println!("Example2\n");
 
     // Create edit distance aligner with banded static heuristic
-    let aligner = AffineWavefronts::new_aligner_edit(Some(&HeuristicStrategy::BandedStatic {
+    let aligner = Distance::Edit.create_aligner(Some(&HeuristicStrategy::BandedStatic {
         band_min_k: -15,
         band_max_k: 15,
     }));

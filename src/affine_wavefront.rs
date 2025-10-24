@@ -1,6 +1,11 @@
 use crate::bindings::*;
 use core::slice;
 
+/// Distance metric for alignment
+///
+/// This type is primarily for internal use. Most users should use the
+/// convenience functions like `create_edit_aligner()` instead of constructing
+/// this enum directly.
 #[derive(Debug, Clone)]
 pub enum Distance {
     Edit,
@@ -16,6 +21,38 @@ pub enum Distance {
         gap_opening2: i32,
         gap_extension2: i32,
     },
+}
+
+impl Distance {
+    pub fn create_aligner(&self, heuristic: Option<&HeuristicStrategy>) -> AffineWavefronts {
+        match self {
+            Distance::Edit => AffineWavefronts::new_aligner_edit(heuristic),
+            Distance::GapAffine {
+                mismatch,
+                gap_opening,
+                gap_extension,
+            } => AffineWavefronts::new_aligner_gap_affine(
+                *mismatch,
+                *gap_opening,
+                *gap_extension,
+                heuristic,
+            ),
+            Distance::GapAffine2p {
+                mismatch,
+                gap_opening1,
+                gap_extension1,
+                gap_opening2,
+                gap_extension2,
+            } => AffineWavefronts::new_aligner_gap_affine2p(
+                *mismatch,
+                *gap_opening1,
+                *gap_extension1,
+                *gap_opening2,
+                *gap_extension2,
+                heuristic,
+            ),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -176,7 +213,7 @@ impl AffineWavefronts {
         self.wf_aligner
     }
 
-    pub fn new_aligner_edit(heuristic: Option<&HeuristicStrategy>) -> Self {
+    fn new_aligner_edit(heuristic: Option<&HeuristicStrategy>) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
             let mut attributes = wfa::wavefront_aligner_attr_default;
@@ -197,7 +234,7 @@ impl AffineWavefronts {
         }
     }
 
-    pub fn new_aligner_gap_affine(
+    fn new_aligner_gap_affine(
         mismatch: i32,
         gap_opening: i32,
         gap_extension: i32,
@@ -230,7 +267,7 @@ impl AffineWavefronts {
         }
     }
 
-    pub fn new_aligner_gap_affine2p(
+    fn new_aligner_gap_affine2p(
         mismatch: i32,
         gap_opening1: i32,
         gap_extension1: i32,
