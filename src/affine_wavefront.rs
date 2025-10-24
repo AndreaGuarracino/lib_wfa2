@@ -176,81 +176,7 @@ impl AffineWavefronts {
         self.wf_aligner
     }
 
-    fn set_distance(
-        attributes: &mut wfa::wavefront_aligner_attr_t,
-        mode: &Distance,
-    ) {
-        // Match penalty is always 0
-        attributes.affine2p_penalties.match_ = 0;
-
-        match mode {
-            Distance::Edit => {
-                attributes.distance_metric = wfa::distance_metric_t_edit;
-            }
-            Distance::GapAffine { mismatch, gap_opening, gap_extension } => {
-                attributes.distance_metric = wfa::distance_metric_t_gap_affine;
-                attributes.affine_penalties.mismatch = *mismatch;
-                attributes.affine_penalties.gap_opening = *gap_opening;
-                attributes.affine_penalties.gap_extension = *gap_extension;
-            }
-            Distance::GapAffine2p { mismatch, gap_opening1, gap_extension1, gap_opening2, gap_extension2 } => {
-                attributes.distance_metric = wfa::distance_metric_t_gap_affine_2p;
-                attributes.affine2p_penalties.mismatch = *mismatch;
-                attributes.affine2p_penalties.gap_opening1 = *gap_opening1;
-                attributes.affine2p_penalties.gap_extension1 = *gap_extension1;
-                attributes.affine2p_penalties.gap_opening2 = *gap_opening2;
-                attributes.affine2p_penalties.gap_extension2 = *gap_extension2;
-            }
-        }
-    }
-
-    fn set_heuristic(
-        attributes: &mut wfa::wavefront_aligner_attr_t,
-        heuristic: Option<&HeuristicStrategy>,
-    ) {
-        match heuristic {
-            Some(HeuristicStrategy::BandedStatic { band_min_k, band_max_k }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_banded_static;
-                attributes.heuristic.min_k = *band_min_k;
-                attributes.heuristic.max_k = *band_max_k;
-            }
-            Some(HeuristicStrategy::BandedAdaptive { band_min_k, band_max_k, score_steps }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_banded_adaptive;
-                attributes.heuristic.min_k = *band_min_k;
-                attributes.heuristic.max_k = *band_max_k;
-                attributes.heuristic.steps_between_cutoffs = *score_steps;
-            }
-            Some(HeuristicStrategy::WFAdaptive { min_wavefront_length, max_distance_threshold, score_steps }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfadaptive;
-                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
-                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
-                attributes.heuristic.steps_between_cutoffs = *score_steps;
-            }
-            Some(HeuristicStrategy::XDrop { xdrop, score_steps }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_xdrop;
-                attributes.heuristic.xdrop = *xdrop;
-                attributes.heuristic.steps_between_cutoffs = *score_steps;
-            }
-            Some(HeuristicStrategy::ZDrop { zdrop, score_steps }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_zdrop;
-                attributes.heuristic.zdrop = *zdrop;
-                attributes.heuristic.steps_between_cutoffs = *score_steps;
-            }
-            Some(HeuristicStrategy::WFMash { min_wavefront_length, max_distance_threshold, score_steps }) => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfmash;
-                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
-                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
-                attributes.heuristic.steps_between_cutoffs = *score_steps;
-            }
-            Some(HeuristicStrategy::None) | _ => {
-                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
-            }
-        }
-    }
-
-    pub fn new_aligner_edit(
-        heuristic: Option<&HeuristicStrategy>,
-    ) -> Self {
+    pub fn new_aligner_edit(heuristic: Option<&HeuristicStrategy>) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
             let mut attributes = wfa::wavefront_aligner_attr_default;
@@ -271,7 +197,7 @@ impl AffineWavefronts {
         }
     }
 
-    pub fn  new_aligner_gap_affine(
+    pub fn new_aligner_gap_affine(
         mismatch: i32,
         gap_opening: i32,
         gap_extension: i32,
@@ -393,9 +319,127 @@ impl AffineWavefronts {
     }
 
     /// Report the size of the underlying WFA aligner in bytes.
-    pub fn get_size(&self) -> u64 {
+    pub fn get_aligner_size(&self) -> u64 {
+        unsafe { wfa::wavefront_aligner_get_size(self.wf_aligner) }
+    }
+
+    fn set_distance(attributes: &mut wfa::wavefront_aligner_attr_t, mode: &Distance) {
+        // Match penalty is always 0
+        attributes.affine2p_penalties.match_ = 0;
+
+        match mode {
+            Distance::Edit => {
+                attributes.distance_metric = wfa::distance_metric_t_edit;
+            }
+            Distance::GapAffine {
+                mismatch,
+                gap_opening,
+                gap_extension,
+            } => {
+                attributes.distance_metric = wfa::distance_metric_t_gap_affine;
+                attributes.affine_penalties.mismatch = *mismatch;
+                attributes.affine_penalties.gap_opening = *gap_opening;
+                attributes.affine_penalties.gap_extension = *gap_extension;
+            }
+            Distance::GapAffine2p {
+                mismatch,
+                gap_opening1,
+                gap_extension1,
+                gap_opening2,
+                gap_extension2,
+            } => {
+                attributes.distance_metric = wfa::distance_metric_t_gap_affine_2p;
+                attributes.affine2p_penalties.mismatch = *mismatch;
+                attributes.affine2p_penalties.gap_opening1 = *gap_opening1;
+                attributes.affine2p_penalties.gap_extension1 = *gap_extension1;
+                attributes.affine2p_penalties.gap_opening2 = *gap_opening2;
+                attributes.affine2p_penalties.gap_extension2 = *gap_extension2;
+            }
+        }
+    }
+
+    pub fn get_distance(&self) -> Distance {
         unsafe {
-            wfa::wavefront_aligner_get_size(self.wf_aligner)
+            let aligner = *self.aligner();
+            let metric = aligner.penalties.distance_metric;
+
+            match metric {
+                wfa::distance_metric_t_edit => Distance::Edit,
+                wfa::distance_metric_t_gap_affine => Distance::GapAffine {
+                    mismatch: aligner.penalties.mismatch,
+                    gap_opening: aligner.penalties.gap_opening1,
+                    gap_extension: aligner.penalties.gap_extension1,
+                },
+                wfa::distance_metric_t_gap_affine_2p => Distance::GapAffine2p {
+                    mismatch: aligner.penalties.mismatch,
+                    gap_opening1: aligner.penalties.gap_opening1,
+                    gap_extension1: aligner.penalties.gap_extension1,
+                    gap_opening2: aligner.penalties.gap_opening2,
+                    gap_extension2: aligner.penalties.gap_extension2,
+                },
+                _ => Distance::Edit, // Default fallback
+            }
+        }
+    }
+
+    fn set_heuristic(
+        attributes: &mut wfa::wavefront_aligner_attr_t,
+        heuristic: Option<&HeuristicStrategy>,
+    ) {
+        match heuristic {
+            Some(HeuristicStrategy::BandedStatic {
+                band_min_k,
+                band_max_k,
+            }) => {
+                attributes.heuristic.strategy =
+                    wfa::wf_heuristic_strategy_wf_heuristic_banded_static;
+                attributes.heuristic.min_k = *band_min_k;
+                attributes.heuristic.max_k = *band_max_k;
+            }
+            Some(HeuristicStrategy::BandedAdaptive {
+                band_min_k,
+                band_max_k,
+                score_steps,
+            }) => {
+                attributes.heuristic.strategy =
+                    wfa::wf_heuristic_strategy_wf_heuristic_banded_adaptive;
+                attributes.heuristic.min_k = *band_min_k;
+                attributes.heuristic.max_k = *band_max_k;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::WFAdaptive {
+                min_wavefront_length,
+                max_distance_threshold,
+                score_steps,
+            }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfadaptive;
+                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
+                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::XDrop { xdrop, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_xdrop;
+                attributes.heuristic.xdrop = *xdrop;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::ZDrop { zdrop, score_steps }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_zdrop;
+                attributes.heuristic.zdrop = *zdrop;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::WFMash {
+                min_wavefront_length,
+                max_distance_threshold,
+                score_steps,
+            }) => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_wfmash;
+                attributes.heuristic.min_wavefront_length = *min_wavefront_length;
+                attributes.heuristic.max_distance_threshold = *max_distance_threshold;
+                attributes.heuristic.steps_between_cutoffs = *score_steps;
+            }
+            Some(HeuristicStrategy::None) | _ => {
+                attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            }
         }
     }
 
@@ -446,10 +490,7 @@ impl AffineWavefronts {
         hs
     }
 
-    fn set_alignment_scope(
-        attributes: &mut wfa::wavefront_aligner_attr_t,
-        scope: AlignmentScope,
-    ) {
+    fn set_alignment_scope(attributes: &mut wfa::wavefront_aligner_attr_t, scope: AlignmentScope) {
         attributes.alignment_scope = match scope {
             AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
             AlignmentScope::Alignment => wfa::alignment_scope_t_compute_alignment,
@@ -462,10 +503,7 @@ impl AffineWavefronts {
         AlignmentScope::from_scope(a.alignment_scope)
     }
 
-    fn set_alignment_span(
-        attributes: &mut wfa::wavefront_aligner_attr_t,
-        span: AlignmentSpan,
-    ) {
+    fn set_alignment_span(attributes: &mut wfa::wavefront_aligner_attr_t, span: AlignmentSpan) {
         match span {
             AlignmentSpan::End2End => {
                 attributes.alignment_form.span = wfa::alignment_span_t_alignment_end2end;
@@ -495,10 +533,7 @@ impl AffineWavefronts {
         AlignmentSpan::from_form(form)
     }
 
-    fn set_memory_mode(
-        attributes: &mut wfa::wavefront_aligner_attr_t,
-        mode: MemoryMode,
-    ) {
+    fn set_memory_mode(attributes: &mut wfa::wavefront_aligner_attr_t, mode: MemoryMode) {
         attributes.memory_mode = match mode {
             MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
             MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
