@@ -219,13 +219,13 @@ impl AffineWavefronts {
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
             // Set distance mode (includes distance metric and penalties)
-            Self::set_distance(&mut attributes, &Distance::Edit);
+            Self::set_distance_attr(&mut attributes, &Distance::Edit);
 
             // Set memory mode
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
-            Self::set_heuristic(&mut attributes, heuristic);
+            Self::set_heuristic_attr(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
@@ -245,7 +245,7 @@ impl AffineWavefronts {
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
             // Set distance mode (includes distance metric and penalties)
-            Self::set_distance(
+            Self::set_distance_attr(
                 &mut attributes,
                 &Distance::GapAffine {
                     mismatch,
@@ -258,7 +258,7 @@ impl AffineWavefronts {
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
-            Self::set_heuristic(&mut attributes, heuristic);
+            Self::set_heuristic_attr(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
@@ -280,7 +280,7 @@ impl AffineWavefronts {
             let mut attributes = wfa::wavefront_aligner_attr_default;
 
             // Set distance mode (includes distance metric and penalties)
-            Self::set_distance(
+            Self::set_distance_attr(
                 &mut attributes,
                 &Distance::GapAffine2p {
                     mismatch,
@@ -295,7 +295,7 @@ impl AffineWavefronts {
             attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
 
             // Configure heuristic before creating aligner
-            Self::set_heuristic(&mut attributes, heuristic);
+            Self::set_heuristic_attr(&mut attributes, heuristic);
 
             // Create aligner with attributes
             let wf_aligner = wfa::wavefront_aligner_new(&mut attributes);
@@ -360,7 +360,7 @@ impl AffineWavefronts {
         unsafe { wfa::wavefront_aligner_get_size(self.wf_aligner) }
     }
 
-    fn set_distance(attributes: &mut wfa::wavefront_aligner_attr_t, mode: &Distance) {
+    fn set_distance_attr(attributes: &mut wfa::wavefront_aligner_attr_t, mode: &Distance) {
         match mode {
             Distance::Edit => {
                 attributes.distance_metric = wfa::distance_metric_t_edit;
@@ -416,7 +416,7 @@ impl AffineWavefronts {
         }
     }
 
-    fn set_heuristic(
+    fn set_heuristic_attr(
         attributes: &mut wfa::wavefront_aligner_attr_t,
         heuristic: Option<&HeuristicStrategy>,
     ) {
@@ -477,6 +477,62 @@ impl AffineWavefronts {
         }
     }
 
+    /// Update heuristic on an already-created aligner
+    pub fn set_heuristic(&mut self, heuristic: Option<&HeuristicStrategy>) {
+        unsafe {
+            match heuristic {
+                Some(HeuristicStrategy::BandedStatic { band_min_k, band_max_k }) => {
+                    wfa::wavefront_aligner_set_heuristic_banded_static(
+                        self.wf_aligner,
+                        *band_min_k,
+                        *band_max_k,
+                    );
+                }
+                Some(HeuristicStrategy::BandedAdaptive { band_min_k, band_max_k, score_steps }) => {
+                    wfa::wavefront_aligner_set_heuristic_banded_adaptive(
+                        self.wf_aligner,
+                        *band_min_k,
+                        *band_max_k,
+                        *score_steps,
+                    );
+                }
+                Some(HeuristicStrategy::WFAdaptive { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                    wfa::wavefront_aligner_set_heuristic_wfadaptive(
+                        self.wf_aligner,
+                        *min_wavefront_length,
+                        *max_distance_threshold,
+                        *score_steps,
+                    );
+                }
+                Some(HeuristicStrategy::XDrop { xdrop, score_steps }) => {
+                    wfa::wavefront_aligner_set_heuristic_xdrop(
+                        self.wf_aligner,
+                        *xdrop,
+                        *score_steps,
+                    );
+                }
+                Some(HeuristicStrategy::ZDrop { zdrop, score_steps }) => {
+                    wfa::wavefront_aligner_set_heuristic_zdrop(
+                        self.wf_aligner,
+                        *zdrop,
+                        *score_steps,
+                    );
+                }
+                Some(HeuristicStrategy::WFMash { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                    wfa::wavefront_aligner_set_heuristic_wfmash(
+                        self.wf_aligner,
+                        *min_wavefront_length,
+                        *max_distance_threshold,
+                        *score_steps,
+                    );
+                }
+                Some(HeuristicStrategy::None) | None => {
+                    wfa::wavefront_aligner_set_heuristic_none(self.wf_aligner);
+                }
+            }
+        }
+    }
+
     pub fn get_heuristics(&self) -> Vec<HeuristicStrategy> {
         let mut hs = Vec::new();
         let heuristic = unsafe { *self.wf_aligner }.heuristic;
@@ -524,57 +580,14 @@ impl AffineWavefronts {
         hs
     }
 
-    fn set_alignment_scope(attributes: &mut wfa::wavefront_aligner_attr_t, scope: AlignmentScope) {
-        attributes.alignment_scope = match scope {
-            AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
-            AlignmentScope::Alignment => wfa::alignment_scope_t_compute_alignment,
-            AlignmentScope::Undefined => panic!("Cannot set an undefined scope"),
-        }
-    }
-
     pub fn get_alignment_scope(&self) -> AlignmentScope {
         let a = unsafe { *self.wf_aligner };
         AlignmentScope::from_scope(a.alignment_scope)
     }
 
-    fn set_alignment_span(attributes: &mut wfa::wavefront_aligner_attr_t, span: AlignmentSpan) {
-        match span {
-            AlignmentSpan::End2End => {
-                attributes.alignment_form.span = wfa::alignment_span_t_alignment_end2end;
-                attributes.alignment_form.pattern_begin_free = 0;
-                attributes.alignment_form.pattern_end_free = 0;
-                attributes.alignment_form.text_begin_free = 0;
-                attributes.alignment_form.text_end_free = 0;
-            }
-            AlignmentSpan::EndsFree {
-                pattern_begin_free,
-                pattern_end_free,
-                text_begin_free,
-                text_end_free,
-            } => {
-                attributes.alignment_form.span = wfa::alignment_span_t_alignment_endsfree;
-                attributes.alignment_form.pattern_begin_free = pattern_begin_free;
-                attributes.alignment_form.pattern_end_free = pattern_end_free;
-                attributes.alignment_form.text_begin_free = text_begin_free;
-                attributes.alignment_form.text_end_free = text_end_free;
-            }
-            AlignmentSpan::Undefined => (),
-        }
-    }
-
     pub fn get_alignment_span(&self) -> AlignmentSpan {
         let form = unsafe { *self.aligner() }.alignment_form;
         AlignmentSpan::from_form(form)
-    }
-
-    fn set_memory_mode(attributes: &mut wfa::wavefront_aligner_attr_t, mode: MemoryMode) {
-        attributes.memory_mode = match mode {
-            MemoryMode::High => wfa::wavefront_memory_t_wavefront_memory_high,
-            MemoryMode::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
-            MemoryMode::Low => wfa::wavefront_memory_t_wavefront_memory_low,
-            MemoryMode::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
-            MemoryMode::Undefined => panic!("Cannot set Undefined memory mode!"),
-        }
     }
 
     pub fn get_memory_mode(&self) -> MemoryMode {
