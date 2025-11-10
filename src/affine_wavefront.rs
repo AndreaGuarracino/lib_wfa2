@@ -53,6 +53,35 @@ impl Distance {
             ),
         }
     }
+
+    /// Convert to u8 for binary serialization
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            Distance::Edit => 0,
+            Distance::GapAffine { .. } => 1,
+            Distance::GapAffine2p { .. } => 2,
+        }
+    }
+
+    /// Parse from u8 for binary deserialization
+    pub fn from_u8(code: u8) -> Result<Self, String> {
+        match code {
+            0 => Ok(Distance::Edit),
+            1 => Ok(Distance::GapAffine {
+                mismatch: 0,
+                gap_opening: 0,
+                gap_extension: 0,
+            }),
+            2 => Ok(Distance::GapAffine2p {
+                mismatch: 0,
+                gap_opening1: 0,
+                gap_extension1: 0,
+                gap_opening2: 0,
+                gap_extension2: 0,
+            }),
+            _ => Err(format!("Invalid distance code: {}", code)),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
