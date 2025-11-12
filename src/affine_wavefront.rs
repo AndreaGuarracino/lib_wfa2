@@ -6,7 +6,7 @@ use core::slice;
 /// This type is primarily for internal use. Most users should use the
 /// convenience functions like `create_edit_aligner()` instead of constructing
 /// this enum directly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Distance {
     Edit,
     GapAffine {
@@ -510,14 +510,21 @@ impl AffineWavefronts {
     pub fn set_heuristic(&mut self, heuristic: Option<&HeuristicStrategy>) {
         unsafe {
             match heuristic {
-                Some(HeuristicStrategy::BandedStatic { band_min_k, band_max_k }) => {
+                Some(HeuristicStrategy::BandedStatic {
+                    band_min_k,
+                    band_max_k,
+                }) => {
                     wfa::wavefront_aligner_set_heuristic_banded_static(
                         self.wf_aligner,
                         *band_min_k,
                         *band_max_k,
                     );
                 }
-                Some(HeuristicStrategy::BandedAdaptive { band_min_k, band_max_k, score_steps }) => {
+                Some(HeuristicStrategy::BandedAdaptive {
+                    band_min_k,
+                    band_max_k,
+                    score_steps,
+                }) => {
                     wfa::wavefront_aligner_set_heuristic_banded_adaptive(
                         self.wf_aligner,
                         *band_min_k,
@@ -525,7 +532,11 @@ impl AffineWavefronts {
                         *score_steps,
                     );
                 }
-                Some(HeuristicStrategy::WFAdaptive { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                Some(HeuristicStrategy::WFAdaptive {
+                    min_wavefront_length,
+                    max_distance_threshold,
+                    score_steps,
+                }) => {
                     wfa::wavefront_aligner_set_heuristic_wfadaptive(
                         self.wf_aligner,
                         *min_wavefront_length,
@@ -547,7 +558,11 @@ impl AffineWavefronts {
                         *score_steps,
                     );
                 }
-                Some(HeuristicStrategy::WFMash { min_wavefront_length, max_distance_threshold, score_steps }) => {
+                Some(HeuristicStrategy::WFMash {
+                    min_wavefront_length,
+                    max_distance_threshold,
+                    score_steps,
+                }) => {
                     wfa::wavefront_aligner_set_heuristic_wfmash(
                         self.wf_aligner,
                         *min_wavefront_length,
