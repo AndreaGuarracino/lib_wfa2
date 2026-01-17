@@ -24,9 +24,13 @@ pub enum Distance {
 }
 
 impl Distance {
-    pub fn create_aligner(&self, heuristic: Option<&HeuristicStrategy>) -> AffineWavefronts {
+    pub fn create_aligner(
+        &self,
+        heuristic: Option<&HeuristicStrategy>,
+        memory_mode: Option<&MemoryMode>,
+    ) -> AffineWavefronts {
         match self {
-            Distance::Edit => AffineWavefronts::new_aligner_edit(heuristic),
+            Distance::Edit => AffineWavefronts::new_aligner_edit(heuristic, memory_mode),
             Distance::GapAffine {
                 mismatch,
                 gap_opening,
@@ -36,6 +40,7 @@ impl Distance {
                 *gap_opening,
                 *gap_extension,
                 heuristic,
+                memory_mode,
             ),
             Distance::GapAffine2p {
                 mismatch,
@@ -50,6 +55,7 @@ impl Distance {
                 *gap_opening2,
                 *gap_extension2,
                 heuristic,
+                memory_mode,
             ),
         }
     }
@@ -179,6 +185,16 @@ impl MemoryMode {
             _ => Self::Undefined,
         }
     }
+
+    pub fn to_wfa_value(&self) -> u32 {
+        match self {
+            Self::High => wfa::wavefront_memory_t_wavefront_memory_high,
+            Self::Medium => wfa::wavefront_memory_t_wavefront_memory_med,
+            Self::Low => wfa::wavefront_memory_t_wavefront_memory_low,
+            Self::Ultralow => wfa::wavefront_memory_t_wavefront_memory_ultralow,
+            Self::Undefined => wfa::wavefront_memory_t_wavefront_memory_high, // Default to high
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -242,7 +258,10 @@ impl AffineWavefronts {
         self.wf_aligner
     }
 
-    fn new_aligner_edit(heuristic: Option<&HeuristicStrategy>) -> Self {
+    fn new_aligner_edit(
+        heuristic: Option<&HeuristicStrategy>,
+        memory_mode: Option<&MemoryMode>,
+    ) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
             let mut attributes = wfa::wavefront_aligner_attr_default;
@@ -250,8 +269,10 @@ impl AffineWavefronts {
             // Set distance mode (includes distance metric and penalties)
             Self::set_distance_attr(&mut attributes, &Distance::Edit);
 
-            // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
+            // Set memory mode (default to High)
+            attributes.memory_mode = memory_mode
+                .unwrap_or(&MemoryMode::High)
+                .to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
@@ -268,6 +289,7 @@ impl AffineWavefronts {
         gap_opening: i32,
         gap_extension: i32,
         heuristic: Option<&HeuristicStrategy>,
+        memory_mode: Option<&MemoryMode>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults
@@ -283,8 +305,10 @@ impl AffineWavefronts {
                 },
             );
 
-            // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
+            // Set memory mode (default to High)
+            attributes.memory_mode = memory_mode
+                .unwrap_or(&MemoryMode::High)
+                .to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
@@ -303,6 +327,7 @@ impl AffineWavefronts {
         gap_opening2: i32,
         gap_extension2: i32,
         heuristic: Option<&HeuristicStrategy>,
+        memory_mode: Option<&MemoryMode>,
     ) -> Self {
         unsafe {
             // Create attributes and set defaults (see https://github.com/smarco/WFA2-lib/blob/2ec2891/wavefront/wavefront_attributes.c#L38)
@@ -320,8 +345,10 @@ impl AffineWavefronts {
                 },
             );
 
-            // Set memory mode
-            attributes.memory_mode = wfa::wavefront_memory_t_wavefront_memory_high; // wavefront_memory_t_wavefront_memory_ultralow does not work properly!
+            // Set memory mode (default to High)
+            attributes.memory_mode = memory_mode
+                .unwrap_or(&MemoryMode::High)
+                .to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
