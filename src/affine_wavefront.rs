@@ -270,9 +270,7 @@ impl AffineWavefronts {
             Self::set_distance_attr(&mut attributes, &Distance::Edit);
 
             // Set memory mode (default to High)
-            attributes.memory_mode = memory_mode
-                .unwrap_or(&MemoryMode::High)
-                .to_wfa_value();
+            attributes.memory_mode = memory_mode.unwrap_or(&MemoryMode::High).to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
@@ -306,9 +304,7 @@ impl AffineWavefronts {
             );
 
             // Set memory mode (default to High)
-            attributes.memory_mode = memory_mode
-                .unwrap_or(&MemoryMode::High)
-                .to_wfa_value();
+            attributes.memory_mode = memory_mode.unwrap_or(&MemoryMode::High).to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
@@ -346,9 +342,7 @@ impl AffineWavefronts {
             );
 
             // Set memory mode (default to High)
-            attributes.memory_mode = memory_mode
-                .unwrap_or(&MemoryMode::High)
-                .to_wfa_value();
+            attributes.memory_mode = memory_mode.unwrap_or(&MemoryMode::High).to_wfa_value();
 
             // Configure heuristic before creating aligner
             Self::set_heuristic_attr(&mut attributes, heuristic);
