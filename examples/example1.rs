@@ -3,7 +3,7 @@ use lib_wfa2::affine_wavefront::Distance;
 pub fn main() {
     println!("Example1\n");
     // Create edit distance aligner with no heuristic
-    let aligner = Distance::Edit.create_aligner(None);
+    let aligner = Distance::Edit.create_aligner(None, None);
 
     // pattern means query
     let pattern = b"TCTTTACTCGCGCGTTGGAGAAATACAATAGT";

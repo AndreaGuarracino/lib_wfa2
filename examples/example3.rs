@@ -1,16 +1,9 @@
-use lib_wfa2::affine_wavefront::{Distance, HeuristicStrategy};
+use lib_wfa2::affine_wavefront::{Distance, MemoryMode};
 
 pub fn main() {
-    println!("Example2\n");
-
-    // Create edit distance aligner with banded static heuristic
-    let aligner = Distance::Edit.create_aligner(
-        Some(&HeuristicStrategy::BandedStatic {
-            band_min_k: -15,
-            band_max_k: 15,
-        }),
-        None,
-    );
+    println!("Example3 - UltraLow memory mode\n");
+    // Create edit distance aligner with no heuristic, using UltraLow memory mode
+    let aligner = Distance::Edit.create_aligner(None, Some(&MemoryMode::Ultralow));
 
     // pattern means query
     let pattern = b"TCTTTACTCGCGCGTTGGAGAAATACAATAGT";
@@ -26,4 +19,5 @@ pub fn main() {
     println!("Status: {:?}", status);
     println!("Score: {}", aligner.score());
     println!("Cigar: {}", String::from_utf8_lossy(aligner.cigar()));
+    println!("Memory mode: {:?}", aligner.get_memory_mode());
 }
