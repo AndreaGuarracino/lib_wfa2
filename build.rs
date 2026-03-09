@@ -79,9 +79,17 @@ fn build_wfa() -> Result<(), Box<dyn std::error::Error>> {
         // Explicitly set the correct OpenMP flags for macOS to override Makefile logic.
         make_cmd.env("OMP_FLAG", "-Xpreprocessor -fopenmp -lomp");
     } else if target.contains("x86_64") {
-        make_cmd.env("CFLAGS", "-O3 -march=native");
+        if env::var("PORTABLE").unwrap_or_default() == "1" {
+            make_cmd.env("CFLAGS", "-O3");
+        } else {
+            make_cmd.env("CFLAGS", "-O3 -march=native");
+        }
     } else if target.contains("aarch64") || target.contains("arm") {
-        make_cmd.env("CFLAGS", "-O3 -mcpu=native");
+        if env::var("PORTABLE").unwrap_or_default() == "1" {
+            make_cmd.env("CFLAGS", "-O3");
+        } else {
+            make_cmd.env("CFLAGS", "-O3 -mcpu=native");
+        }
     } else {
         make_cmd.env("CFLAGS", "-O3");
     }
