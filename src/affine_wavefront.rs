@@ -657,6 +657,59 @@ impl AffineWavefronts {
         MemoryMode::from_value(a.memory_mode)
     }
 
+    /// Gap-affine aligner that also takes an explicit match penalty.
+    ///
+    /// `Distance::GapAffine` cannot carry a match penalty, so callers that need
+    /// a non-zero one use this instead.
+    pub fn with_penalties_and_memory_mode(
+        match_: i32,
+        mismatch: i32,
+        gap_opening: i32,
+        gap_extension: i32,
+        memory_mode: MemoryMode,
+    ) -> Self {
+        unsafe {
+            let mut attributes = wfa::wavefront_aligner_attr_default;
+            attributes.distance_metric = wfa::distance_metric_t_gap_affine;
+            attributes.affine_penalties.match_ = match_;
+            attributes.affine_penalties.mismatch = mismatch;
+            attributes.affine_penalties.gap_opening = gap_opening;
+            attributes.affine_penalties.gap_extension = gap_extension;
+            attributes.memory_mode = memory_mode.to_wfa_value();
+            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            Self {
+                wf_aligner: wfa::wavefront_aligner_new(&mut attributes),
+            }
+        }
+    }
+
+    /// Two-piece gap-affine aligner that also takes an explicit match penalty.
+    pub fn with_penalties_affine2p_and_memory_mode(
+        match_: i32,
+        mismatch: i32,
+        gap_opening1: i32,
+        gap_extension1: i32,
+        gap_opening2: i32,
+        gap_extension2: i32,
+        memory_mode: MemoryMode,
+    ) -> Self {
+        unsafe {
+            let mut attributes = wfa::wavefront_aligner_attr_default;
+            attributes.distance_metric = wfa::distance_metric_t_gap_affine_2p;
+            attributes.affine2p_penalties.match_ = match_;
+            attributes.affine2p_penalties.mismatch = mismatch;
+            attributes.affine2p_penalties.gap_opening1 = gap_opening1;
+            attributes.affine2p_penalties.gap_extension1 = gap_extension1;
+            attributes.affine2p_penalties.gap_opening2 = gap_opening2;
+            attributes.affine2p_penalties.gap_extension2 = gap_extension2;
+            attributes.memory_mode = memory_mode.to_wfa_value();
+            attributes.heuristic.strategy = wfa::wf_heuristic_strategy_wf_heuristic_none;
+            Self {
+                wf_aligner: wfa::wavefront_aligner_new(&mut attributes),
+            }
+        }
+    }
+
     pub fn set_alignment_scope(&mut self, scope: AlignmentScope) {
         unsafe {
             (*self.wf_aligner).alignment_scope = match scope {
