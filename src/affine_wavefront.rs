@@ -656,4 +656,38 @@ impl AffineWavefronts {
         let a = unsafe { *self.aligner() };
         MemoryMode::from_value(a.memory_mode)
     }
+
+    pub fn set_alignment_scope(&mut self, scope: AlignmentScope) {
+        unsafe {
+            (*self.wf_aligner).alignment_scope = match scope {
+                AlignmentScope::Alignment | AlignmentScope::Undefined => {
+                    wfa::alignment_scope_t_compute_alignment
+                }
+                AlignmentScope::ComputeScore => wfa::alignment_scope_t_compute_score,
+            };
+        }
+    }
+
+    pub fn set_alignment_span(&mut self, span: AlignmentSpan) {
+        unsafe {
+            let form = &mut (*self.wf_aligner).alignment_form;
+            match span {
+                AlignmentSpan::End2End | AlignmentSpan::Undefined => {
+                    form.span = wfa::alignment_span_t_alignment_end2end;
+                }
+                AlignmentSpan::EndsFree {
+                    pattern_begin_free,
+                    pattern_end_free,
+                    text_begin_free,
+                    text_end_free,
+                } => {
+                    form.span = wfa::alignment_span_t_alignment_endsfree;
+                    form.pattern_begin_free = pattern_begin_free;
+                    form.pattern_end_free = pattern_end_free;
+                    form.text_begin_free = text_begin_free;
+                    form.text_end_free = text_end_free;
+                }
+            }
+        }
+    }
 }
