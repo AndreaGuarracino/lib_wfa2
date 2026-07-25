@@ -1,7 +1,7 @@
 use wfa::wavefront_aligner_set_max_alignment_steps;
 
 use crate::bindings::*;
-use core::slice;
+use std::os::raw::c_char;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DistanceMetric {
@@ -688,14 +688,12 @@ impl AffineWavefronts {
 
     pub fn align(&self, a: &[u8], b: &[u8]) -> AlignmentStatus {
         unsafe {
-            let a = slice::from_raw_parts(a.as_ptr() as *const i8, a.len());
-            let b = slice::from_raw_parts(b.as_ptr() as *const i8, b.len());
-
+            // c_char is i8 on x86_64 but u8 on aarch64-linux, so cast to it by name.
             let alignment_status: AlignmentStatus = wfa::wavefront_align(
                 self.wf_aligner,
-                a.as_ptr(),
+                a.as_ptr() as *const c_char,
                 a.len() as i32,
-                b.as_ptr(),
+                b.as_ptr() as *const c_char,
                 b.len() as i32,
             )
             .into();
