@@ -9,6 +9,8 @@ repository = "https://github.com/AndreaGuarracino/lib_wfa2"
 readme = "README.md"
 keywords = ["bioinformatics", "alignment", "wfa"]
 categories = ["science"]
+# One native WFA2-lib per binary: cargo rejects two lib_wfa2 versions in one tree.
+links = "wfa"
 
 [dependencies]
 
