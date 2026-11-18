@@ -1629,6 +1629,7 @@ pub struct _wavefront_aligner_t {
     pub penalties: wavefront_penalties_t,
     pub heuristic: wavefront_heuristic_t,
     pub memory_mode: wavefront_memory_t,
+    pub singletrack: bool,
     pub wf_components: wavefront_components_t,
     pub component_begin: affine2p_matrix_type,
     pub component_end: affine2p_matrix_type,
@@ -1643,7 +1644,7 @@ pub struct _wavefront_aligner_t {
 }
 #[allow(clippy::unnecessary_operation, clippy::identity_op)]
 const _: () = {
-    ["Size of _wavefront_aligner_t"][::std::mem::size_of::<_wavefront_aligner_t>() - 648usize];
+    ["Size of _wavefront_aligner_t"][::std::mem::size_of::<_wavefront_aligner_t>() - 656usize];
     ["Alignment of _wavefront_aligner_t"][::std::mem::align_of::<_wavefront_aligner_t>() - 8usize];
     ["Offset of field: _wavefront_aligner_t::align_mode"]
         [::std::mem::offset_of!(_wavefront_aligner_t, align_mode) - 0usize];
@@ -1664,27 +1665,29 @@ const _: () = {
     ["Offset of field: _wavefront_aligner_t::memory_mode"]
         [::std::mem::offset_of!(_wavefront_aligner_t, memory_mode) - 324usize];
     ["Offset of field: _wavefront_aligner_t::wf_components"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, wf_components) - 328usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, wf_components) - 336usize];
+    ["Offset of field: _wavefront_aligner_t::singletrack"]
+        [::std::mem::offset_of!(_wavefront_aligner_t, singletrack) - 328usize];
     ["Offset of field: _wavefront_aligner_t::component_begin"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, component_begin) - 424usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, component_begin) - 432usize];
     ["Offset of field: _wavefront_aligner_t::component_end"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, component_end) - 428usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, component_end) - 436usize];
     ["Offset of field: _wavefront_aligner_t::alignment_end_pos"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, alignment_end_pos) - 432usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, alignment_end_pos) - 440usize];
     ["Offset of field: _wavefront_aligner_t::bialigner"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, bialigner) - 448usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, bialigner) - 456usize];
     ["Offset of field: _wavefront_aligner_t::cigar"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, cigar) - 456usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, cigar) - 464usize];
     ["Offset of field: _wavefront_aligner_t::mm_allocator_own"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, mm_allocator_own) - 464usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, mm_allocator_own) - 472usize];
     ["Offset of field: _wavefront_aligner_t::mm_allocator"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, mm_allocator) - 472usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, mm_allocator) - 480usize];
     ["Offset of field: _wavefront_aligner_t::wavefront_slab"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, wavefront_slab) - 480usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, wavefront_slab) - 488usize];
     ["Offset of field: _wavefront_aligner_t::plot"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, plot) - 488usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, plot) - 496usize];
     ["Offset of field: _wavefront_aligner_t::system"]
-        [::std::mem::offset_of!(_wavefront_aligner_t, system) - 496usize];
+        [::std::mem::offset_of!(_wavefront_aligner_t, system) - 504usize];
 };
 unsafe extern "C" {
     pub fn wavefront_aligner_new(
